@@ -73,7 +73,11 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
 	err := json.Unmarshal(event.GetBody(), &udp.request)
 	if err != nil {
-		return nil, err
+		return nuclio.Response{
+			StatusCode:  400,
+			ContentType: "application/text",
+			Body:        []byte(err.Error()),
+		}, nil
 	}
 	app := *udp.appender
 

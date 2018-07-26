@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/nuclio/nuclio-test-go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
@@ -10,6 +11,30 @@ import (
 	"testing"
 	"time"
 )
+
+const eventExample2 = `
+{
+	"Metric": "cpu",
+	"Labels": {
+		"dc": "7",
+		"hostname": "mybesthost"
+	},
+	"Samples": [
+		{
+			"Time": "1532595999999",
+			"Value": {
+				"N": 11
+			}
+		},
+		{
+			"Time": "1532596999123",
+			"Value": {
+				"N": 0
+			}
+		}
+	]
+}
+`
 
 type mockAppender struct {
 	mock.Mock
@@ -40,7 +65,7 @@ func (m *mockAppender) Rollback() error {
 	return nil
 }
 
-func TestHandler(t *testing.T) {
+func TestEvent(t *testing.T) {
 	var m = map[string]nuclio.DataBinding{"db0": (*v3io.Container)(nil)}
 	nuclioContextP := &nuclio.Context{DataBinding: m}
 	mockAppender := mockAppender{}
@@ -67,8 +92,80 @@ func TestHandler(t *testing.T) {
 		int64(1532595948517),
 		float64(86.8),
 	)
-	_, err := Handler(nuclioContextP, &testEvent)
+	result, err := Handler(nuclioContextP, &testEvent)
 	if err != nil {
 		t.Error(err)
 	}
+	assert.Equal(t, "", result)
+}
+
+func TestMultipleEvents(t *testing.T) {
+	var m = map[string]nuclio.DataBinding{"db0": (*v3io.Container)(nil)}
+	nuclioContextP := &nuclio.Context{DataBinding: m}
+	mockAppender := mockAppender{}
+	var appender tsdb.Appender = &mockAppender
+	nuclioContextP.UserData = &userData{
+		appender: &appender,
+	}
+	testEvent1 := nutest.TestEvent{
+		Body: []byte(eventExample),
+	}
+	testEvent2 := nutest.TestEvent{
+		Body: []byte(eventExample2),
+	}
+	expectedLabels := utils.Labels{
+		utils.Label{Name: "dc", Value: "7"},
+		utils.Label{Name: "hostname", Value: "mybesthost"},
+	}
+	mockAppender.On(
+		"Add",
+		expectedLabels,
+		int64(1532595945142),
+		float64(95.2),
+	)
+	mockAppender.On(
+		"Add",
+		expectedLabels,
+		int64(1532595948517),
+		float64(86.8),
+	)
+	mockAppender.On(
+		"Add",
+		expectedLabels,
+		int64(1532595999999),
+		float64(11),
+	)
+	mockAppender.On(
+		"Add",
+		expectedLabels,
+		int64(1532596999123),
+		float64(0.0),
+	)
+	result, err := Handler(nuclioContextP, &testEvent1)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, "", result)
+	result, err = Handler(nuclioContextP, &testEvent2)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, "", result)
+}
+
+func TestBadRequest(t *testing.T) {
+	var m = map[string]nuclio.DataBinding{"db0": (*v3io.Container)(nil)}
+	nuclioContextP := &nuclio.Context{DataBinding: m}
+	mockAppender := mockAppender{}
+	var appender tsdb.Appender = &mockAppender
+	nuclioContextP.UserData = &userData{
+		appender: &appender,
+	}
+	testEvent := nutest.TestEvent{}
+	result, err := Handler(nuclioContextP, &testEvent)
+	if err != nil {
+		t.Error(err)
+	}
+	response := result.(nuclio.Response)
+	assert.Equal(t, 400, response.StatusCode)
 }

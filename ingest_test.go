@@ -77,6 +77,7 @@ func TestEvent(t *testing.T) {
 		Body: []byte(eventExample),
 	}
 	expectedLabels := utils.Labels{
+		utils.Label{Name: "__name__", Value: "cpu"},
 		utils.Label{Name: "dc", Value: "7"},
 		utils.Label{Name: "hostname", Value: "mybesthost"},
 	}
@@ -114,6 +115,7 @@ func TestMultipleEvents(t *testing.T) {
 		Body: []byte(eventExample2),
 	}
 	expectedLabels := utils.Labels{
+		utils.Label{Name: "__name__", Value: "cpu"},
 		utils.Label{Name: "dc", Value: "7"},
 		utils.Label{Name: "hostname", Value: "mybesthost"},
 	}

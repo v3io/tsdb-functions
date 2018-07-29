@@ -81,6 +81,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	}
 	app := *udp.appender
 
+	udp.request.Labels["__name__"] = udp.request.Metric
 	udp.lset = fromMap(udp.request.Labels, udp.lset)
 
 	for _, s := range udp.request.Samples {

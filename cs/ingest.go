@@ -30,9 +30,6 @@ type Value struct {
 
 type userData struct {
 	appender *tsdb.Appender
-	lset     utils.Labels
-	time     int64
-	value    float64
 }
 
 var adapter *tsdb.V3ioAdapter
@@ -51,10 +48,9 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		}, nil
 	}
 
-	var err error
 	metric := parts[0]
-	udp.time, err = strconv.ParseInt(parts[1], 10, 64)
-	udp.time *= 1000
+	time, err := strconv.ParseInt(parts[1], 10, 64)
+	time *= 1000
 	if err != nil {
 		return nuclio.Response{
 			StatusCode:  400,
@@ -62,7 +58,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 			Body:        []byte("Failed to parse int"),
 		}, nil
 	}
-	udp.value, err = strconv.ParseFloat(parts[2], 64)
+	value, err := strconv.ParseFloat(parts[2], 64)
 	if err != nil {
 		return nuclio.Response{
 			StatusCode:  400,
@@ -71,8 +67,8 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		}, nil
 	}
 
-	udp.lset = udp.lset[0:0]
-	udp.lset = append(udp.lset, utils.Label{Name: "__name__", Value: metric})
+	var lset utils.Labels
+	lset = append(lset, utils.Label{Name: "__name__", Value: metric})
 
 	for _, part := range parts[3:] {
 		index := strings.IndexByte(part, '=')
@@ -85,14 +81,14 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		}
 		labelName := part[:index]
 		labelValue := part[index+1:]
-		udp.lset = append(udp.lset, utils.Label{Name: labelName, Value: labelValue})
+		lset = append(lset, utils.Label{Name: labelName, Value: labelValue})
 	}
 
-	sort.Sort(udp.lset)
+	sort.Sort(lset)
 
 	app := *udp.appender
 
-	_, err = app.Add(udp.lset, udp.time, udp.value)
+	_, err = app.Add(lset, time, value)
 
 	return "", err
 }
